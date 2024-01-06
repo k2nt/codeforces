@@ -9,10 +9,7 @@ def pwd() -> Path:
     Returns:
         str: Current working directory
     """
-    # Scripts run in the 'scripts' folder, while programs are compiled to their
-    #   language folders. The '.parent' subscript is to resolve script paths to
-    #   the working directory, i.e., 'scripts/...' -> '/...'
-    return Path().resolve().parent
+    return Path().resolve()
 
 
 def to_pwd_path(path: str | Path) -> str:

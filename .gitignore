@@ -30,6 +30,7 @@
 *.exe
 *.out
 *.app
+**/xc
 
 # Python
 **/__pycache__
