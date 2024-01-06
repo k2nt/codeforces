@@ -6,3 +6,7 @@ filepath_option = typer.Option(
     help="Path to file.",
     exists=True
     )
+dry_run_option = typer.Option(
+    False,
+    help="Executes without making changes.",
+)
