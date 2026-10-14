@@ -6,7 +6,7 @@ Solutions and helper scripts live in `src/<language>/`. Name solutions by
 problem ID, such as `123A.cpp`. Input files can stay beside the source.
 Generated binaries go in `build/<language>/`.
 
-## C++
+## CPP
 
 Requires Bash and GNU GCC 16 (`g++-16`). Uses C++23 by default.
 
