@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ $# -ne 1 ]]; then
+    printf 'Usage: %s <source.cpp>\n' "$0" >&2
+    exit 2
+fi
+
+root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+source_root="$root"
+standard=23
+build_dir=../../build/cpp
+config="$root/build-config.ini"
+
+trim() {
+    local value="$1"
+    value="${value#"${value%%[![:space:]]*}"}"
+    value="${value%"${value##*[![:space:]]}"}"
+    printf '%s' "$value"
+}
+
+if [[ -f "$config" ]]; then
+    line_number=0
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        ((line_number += 1))
+        line="$(trim "$line")"
+        [[ -z "$line" || "$line" == \#* ]] && continue
+        if [[ "$line" != *=* ]]; then
+            printf 'Error: invalid setting in %s at line %d\n' "$config" "$line_number" >&2
+            exit 2
+        fi
+
+        key="$(trim "${line%%=*}")"
+        value="$(trim "${line#*=}")"
+        case "$key" in
+            CXX_STANDARD) standard="$value" ;;
+            BUILD_DIR) build_dir="$value" ;;
+            *)
+                printf 'Error: unknown setting in %s at line %d: %s\n' "$config" "$line_number" "$key" >&2
+                exit 2
+                ;;
+        esac
+    done < "$config"
+fi
+
+if [[ ! "$standard" =~ ^[0-9]+$ ]]; then
+    printf 'Error: CXX_STANDARD must be a number in %s\n' "$config" >&2
+    exit 2
+fi
+if [[ -z "$build_dir" ]]; then
+    printf 'Error: BUILD_DIR must not be empty in %s\n' "$config" >&2
+    exit 2
+fi
+if [[ "$build_dir" != /* ]]; then
+    build_dir="$root/$build_dir"
+fi
+
+source_file="$1"
+
+if [[ ! -f "$source_file" || "$source_file" != *.cpp ]]; then
+    printf 'Error: expected an existing .cpp file: %s\n' "$source_file" >&2
+    exit 2
+fi
+
+source_dir="$(cd -- "$(dirname -- "$source_file")" && pwd -P)"
+source_file="$source_dir/$(basename -- "$source_file")"
+
+case "$source_file" in
+    "$source_root"/*) relative="${source_file#"$source_root"/}" ;;
+    *)
+        printf 'Error: source must be inside %s\n' "$source_root" >&2
+        exit 2
+        ;;
+esac
+
+compiler="${CXX:-g++-16}"
+if ! command -v "$compiler" >/dev/null 2>&1; then
+    printf 'Error: compiler not found: %s. Set CXX to your compiler executable.\n' "$compiler" >&2
+    exit 127
+fi
+
+platform_flags=()
+if [[ "$(uname -s)" == Darwin ]]; then
+    sdk_path="$(xcrun --show-sdk-path)"
+    platform_flags=(-isysroot "$sdk_path")
+    if [[ -n "${MACOSX_DEPLOYMENT_TARGET:-}" ]]; then
+        platform_flags+=("-mmacosx-version-min=$MACOSX_DEPLOYMENT_TARGET")
+    fi
+fi
+
+output="$build_dir/${relative%.cpp}"
+mkdir -p -- "$(dirname -- "$output")"
+"$compiler" "-std=c++$standard" -O2 -g -Wall -Wextra -Wshadow \
+    ${platform_flags[@]+"${platform_flags[@]}"} \
+    "$source_file" -o "$output" >&2
+printf '%s\n' "$output"
